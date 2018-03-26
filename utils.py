@@ -4,6 +4,7 @@ from numpy.random import permutation
 import numpy as np
 def conv2d(x, output_dim, kernel=5, stride=2, stddev=0.02, padding='SAME', name=None, reuse=False):
     with tf.variable_scope(name) as scope:
+
         if reuse:
             scope.reuse_variables()
         weights = tf.get_variable(name='weights',
