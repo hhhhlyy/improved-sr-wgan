@@ -9,16 +9,19 @@ from myTest  import Tester
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('run', 'test',
+tf.app.flags.DEFINE_string('run', 'train',
                             "choose to run or train.")
+
+tf.app.flags.DEFINE_string('train_model', 'wgangp',
+                            "model name.")
 
 tf.app.flags.DEFINE_string('model', 'default',
                             "model name.")
 
-tf.app.flags.DEFINE_integer('batch_size', 16,
+tf.app.flags.DEFINE_integer('batch_size',32,
                             "Number of samples per batch.")
 
-tf.app.flags.DEFINE_integer('epochs', 10,
+tf.app.flags.DEFINE_integer('epochs', 15,
                             "Number of training epochs")
 
 tf.app.flags.DEFINE_float('lr_gen', 1e-4,
@@ -45,13 +48,16 @@ tf.app.flags.DEFINE_integer('input_width', 64,
 tf.app.flags.DEFINE_integer('input_length', 64,
                             "input length")
 
-tf.app.flags.DEFINE_string('data','data/test.npy',
+tf.app.flags.DEFINE_string('data','/home/yyl/pjs/pycharm-remote/MyGAN/data/train.npy',
                            "data path")
 
 tf.app.flags.DEFINE_string('checkpoint_dir', 'checkpoint',
                            "Output folder where checkpoints are dumped.")
 
 tf.app.flags.DEFINE_string('out_path', '/'.join(['test_out_imgs', strftime('%Y%m%d-%H%M%S')]),
+                           "output imgs path.")
+
+tf.app.flags.DEFINE_string('edge_detect_model', '/home/yyl/pjs/pycharm-remote-data/HED-BSDS/holy-edge/hed/models/hed-model-5000.meta',
                            "output imgs path.")
 
 def main(argv=None):
