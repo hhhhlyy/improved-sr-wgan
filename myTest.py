@@ -8,8 +8,9 @@ from myModel import Model
 from utils import BatchGenerator
 from utils import downsample
 import psnr
-import cv2
 import scipy.ndimage
+from edgeDetect import EdgeDetector
+from newEdgeDetect import NewEdgeDetector
 class Tester(object):
     def __init__(self, dictionary):
         self.__dict__.update(dictionary)
@@ -62,6 +63,20 @@ class Tester(object):
                 tf.abs(fake_data_downsampled - real_data_downsampled))
             cost_gen = run_flags.loss_weight * gen_l1_cost + (1-run_flags.loss_weight) * cost_gen
 
+            # #edge detection
+            edge_detector1 = EdgeDetector('configs/hed.yaml', real_data)
+            edge_detector1.setup(sess)
+            real_edge = edge_detector1.run(sess, real_data)
+
+            edge_detector2 = NewEdgeDetector('configs/hed.yaml', fake_data)
+            edge_detector2.setup(sess)
+            fake_edge = edge_detector2.run(sess, fake_data, reuse=True)
+
+            real_edge_downsampled = downsample(real_edge)
+            fake_edge_downsampled = downsample(fake_edge)
+            edge_cost = tf.reduce_mean(tf.abs(fake_edge_downsampled - real_edge_downsampled))
+
+            cost_gen = 0.8 * cost_gen + edge_cost * 20
             optimizer_gen = tf.train.RMSPropOptimizer(learning_rate=run_flags.lr_gen). \
                 minimize(cost_gen, var_list=var_gen)
             optimizer_dis = tf.train.RMSPropOptimizer(learning_rate=run_flags.lr_dis). \
@@ -79,7 +94,10 @@ class Tester(object):
             optimizer_dis = tf.train.AdamOptimizer(learning_rate=run_flags.lr_dis). \
                 minimize(cost_dis, var_list=var_dis)
 
-        init = tf.global_variables_initializer()
+        # init = tf.global_variables_initializer()
+        var_all = tf.global_variables()
+        var_gan = [var for var in var_all if 'g_' in var.name or 'd_' in var.name]
+        init = tf.variables_initializer(var_gan)
         with tf.Session() as sess:
             sess.run(init)
 
@@ -106,9 +124,9 @@ class Tester(object):
                 if batch.shape[0] != run_flags.batch_size:
                     break
 
-                superres_imgs = sess.run(fake_data, feed_dict={lr_img: batch_sml})
+                superres_imgs  = sess.run(fake_data, feed_dict={lr_img: batch_sml})
 
-                gc, dc  = sess.run([cost_gen, cost_dis], \
+                gc, dc , re, fe = sess.run([cost_gen, cost_dis, real_edge, fake_edge], \
                         feed_dict={real_data : batch_big, lr_img : batch_sml})
 
                 for i,img in enumerate(superres_imgs):
@@ -137,7 +155,7 @@ class Tester(object):
                     ( \
                         array([imresize(img, size=(img_size, img_size, 3)) / 255.0 for img in batch_sml]), \
                         superres_imgs,
-                        batch_big \
+                        batch_big
                     ), 2)
 
                 criteria_psnr = mean(array(

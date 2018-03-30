@@ -10,20 +10,24 @@ from losses import sigmoid_cross_entropy_balanced
 
 class Vgg16():
 
-    def __init__(self, cfgs, run='testing'):
+    def __init__(self, cfgs, img_place_holder, run='testing', reuse=False):
 
         self.cfgs = cfgs
         from myIo import EdgeIO
         self.io = EdgeIO()
+        self.reuse = reuse
 
         base_path = os.path.abspath(os.path.dirname(__file__))
-        weights_file = os.path.join(base_path, '/home/yyl/pjs/pycharm-remote/holy-edge-master/holy-edge-master/hed/models/vgg16.npy')
+        weights_file = os.path.join(base_path,
+                                    '/home/yyl/pjs/pycharm-remote/holy-edge-master/holy-edge-master/hed/models/vgg16.npy')
 
         self.data_dict = np.load(weights_file, encoding='latin1').item()
         # self.io.print_info("Model weights loaded from {}".format(self.cfgs['model_weights_path']))
 
-        self.images = tf.placeholder(tf.float32, [None, self.cfgs[run]['image_height'], self.cfgs[run]['image_width'], self.cfgs[run]['n_channels']])
-        self.edgemaps = tf.placeholder(tf.float32, [None, self.cfgs[run]['image_height'], self.cfgs[run]['image_width'], 1])
+        self.images = img_place_holder
+        # self.images = tf.placeholder(tf.float32, [None, self.cfgs[run]['image_height'], self.cfgs[run]['image_width'], self.cfgs[run]['n_channels']])
+        self.edgemaps = tf.placeholder(tf.float32,
+                                       [None, self.cfgs[run]['image_height'], self.cfgs[run]['image_width'], 1])
 
         self.define_model()
 
@@ -33,7 +37,9 @@ class Vgg16():
         Load VGG params from disk without FC layers A
         Add branch layers (with deconv) after each CONV block
         """
-
+        # with tf.variable_scope("vgg16") as scope:
+        #     if self.reuse:
+        #         scope.reuse_variables()
         start_time = time.time()
 
         self.conv1_1 = self.conv_layer_vgg(self.images, "conv1_1")
@@ -142,7 +148,6 @@ class Vgg16():
             1x1 conv followed with Deconvoltion layer to upscale the size of input image sans color
         """
         with tf.variable_scope(name):
-
             in_shape = inputs.shape.as_list()
             w_shape = [1, 1, in_shape[-1], 1]
 
@@ -178,6 +183,10 @@ class Vgg16():
         """
             Apply sigmoid non-linearity to side layer ouputs + fuse layer outputs for predictions
         """
+        # with tf.variable_scope("vgg16") as scope:
+        #
+        #     if self.reuse:
+        #         scope.reuse_variables()
 
         self.predictions = []
 

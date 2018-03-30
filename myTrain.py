@@ -10,6 +10,7 @@ from utils import BatchGenerator
 from utils import downsample
 import plot
 from edgeDetect import EdgeDetector
+from newEdgeDetect import NewEdgeDetector
 
 
 class Trainer(object):
@@ -44,6 +45,8 @@ class Trainer(object):
             t_vars = tf.trainable_variables()
             var_gen = [var for var in t_vars if 'g_' in var.name]
             var_dis = [var for var in t_vars if 'd_' in var.name]
+            # var_gan = var_gen
+            # var_gan.extend(var_dis)
             cost_gen = -tf.reduce_mean(fake_out_dis)
             cost_dis = tf.reduce_mean(fake_out_dis) - tf.reduce_mean(real_out_dis)
 
@@ -68,22 +71,19 @@ class Trainer(object):
             cost_gen = run_flags.loss_weight * gen_l1_cost + (1-run_flags.loss_weight) * cost_gen
 
             # #edge detection
-            # ########################################
-            # with sess:
-            #     # sess.run(tf.global_variables_initializer())
-            #     # # saver_edge = tf.train.Saver()
-            #     # saver_edge = tf.train.import_meta_graph(run_flags.edge_detect_model)
-            #     # saver_edge.restore(sess, '/home/yyl/pjs/pycharm-remote-data/HED-BSDS/holy-edge/hed/models/hed-model-5000')
-            #     # # saver_edge.restore(sess_edge,run_flags.edge_detect_model)
-            #     # # graph_edge = tf.get_default_graph()
-            #
-            #     #define model
-            edge_detector = EdgeDetector('configs/hed.yaml')
-            edge_detector.setup(sess)
-            real_edge = edge_detector.run(sess,real_data)
-            fake_edge = edge_detector.run(sess,fake_data)
+            edge_detector1 = EdgeDetector('configs/hed.yaml',real_data)
+            edge_detector1.setup(sess)
+            real_edge = edge_detector1.run(sess,real_data)
 
+            edge_detector2 = NewEdgeDetector('configs/hed.yaml',fake_data)
+            edge_detector2.setup(sess)
+            fake_edge = edge_detector2.run(sess,fake_data,reuse=True)
 
+            real_edge_downsampled = downsample(real_edge)
+            fake_edge_downsampled = downsample(fake_edge)
+            edge_cost = tf.reduce_mean(tf.abs(fake_edge_downsampled - real_edge_downsampled))
+
+            cost_gen = 0.8*cost_gen + edge_cost*20
 
             optimizer_gen = tf.train.RMSPropOptimizer(learning_rate=run_flags.lr_gen). \
                 minimize(cost_gen, var_list=var_gen)
@@ -92,18 +92,20 @@ class Trainer(object):
             #optimizer_dis = tf.train.AdamOptimizer(learning_rate=run_flags.lr_dis, beta1=0.5, beta2=0.9). \
              #   minimize(cost_dis, var_list=var_dis)
 
-        if run_flags.train_model == 'gan':
-            fake_data = Model.generative(myModel, lr_img)
-            real_out_dis = Model.discriminative_gan(myModel, real_data)
-            fake_out_dis = Model.discriminative_gan(myModel, fake_data, reuse=True)
-            cost_gen, cost_dis, _,  var_gen, var_dis = Model.costs_and_vars(myModel, real_data, fake_data, real_out_dis, fake_out_dis)
-            optimizer_gen = tf.train.AdamOptimizer(learning_rate=run_flags.lr_gen). \
-                minimize(cost_gen, var_list=var_gen)
-            optimizer_dis = tf.train.AdamOptimizer(learning_rate=run_flags.lr_dis). \
-                minimize(cost_dis, var_list=var_dis)
+        # if run_flags.train_model == 'gan':
+        #     fake_data = Model.generative(myModel, lr_img)
+        #     real_out_dis = Model.discriminative_gan(myModel, real_data)
+        #     fake_out_dis = Model.discriminative_gan(myModel, fake_data, reuse=True)
+        #     cost_gen, cost_dis, _,  var_gen, var_dis = Model.costs_and_vars(myModel, real_data, fake_data, real_out_dis, fake_out_dis)
+        #     optimizer_gen = tf.train.AdamOptimizer(learning_rate=run_flags.lr_gen). \
+        #         minimize(cost_gen, var_list=var_gen)
+        #     optimizer_dis = tf.train.AdamOptimizer(learning_rate=run_flags.lr_dis). \
+        #         minimize(cost_dis, var_list=var_dis)
 
-        init = tf.global_variables_initializer()
-
+        # init = tf.global_variables_initializer()
+        var_all = tf.global_variables()
+        var_gan = [var for var in var_all if 'g_' in var.name or 'd_' in var.name]
+        init = tf.variables_initializer(var_gan)
         with sess:
             sess.run(init)
 
@@ -126,19 +128,20 @@ class Trainer(object):
                     if batch.shape[0] != run_flags.batch_size:
                         break
                     if passed_iters%3==0:
-                        _, gc, dc = sess.run([optimizer_gen, cost_gen, cost_dis],
+                        _, gc, dc, ec, fe= sess.run([optimizer_gen, cost_gen, cost_dis, edge_cost, fake_edge],
                                          feed_dict={real_data : batch_hr, lr_img: batch_lr})
 
-                    op_gen, dis_gc, dis_dc = sess.run([optimizer_dis,cost_gen, cost_dis],
+                    op_gen, dis_gc, dis_dc, dis_ec, dis_fe = sess.run([optimizer_dis,cost_gen, cost_dis, edge_cost, fake_edge],
                              feed_dict={real_data : batch_hr, lr_img: batch_lr})
 
                     passed_iters += 1
 
                     if passed_iters % run_flags.sample_iter == 0:
-                        print('Passed iterations=%d, Generative cost=%.9f, Discriminative cost=%.9f' % \
-                              (passed_iters, gc, dc))
+                        print('Passed iterations=%d, Generative cost=%.9f, Discriminative cost=%.9f, Edge cost=%9f' % \
+                              (passed_iters, gc, dc, ec))
                         plot.plot('train_dis_cost_'+run_flags.train_model, abs(dc))
                         plot.plot('train_gen_cost_'+run_flags.train_model, abs(gc))
+                        plot.plot('train_edge_cost_'+run_flags.train_model, abs(ec))
 
                     if (passed_iters < 5) or (passed_iters % 100 == 99):
                         plot.flush()

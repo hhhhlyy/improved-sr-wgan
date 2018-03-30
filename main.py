@@ -7,9 +7,10 @@ from time import strftime
 from myTrain import Trainer
 from myTest  import Tester
 
+from testEdge import test
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('run', 'train',
+tf.app.flags.DEFINE_string('run', 'test',
                             "choose to run or train.")
 
 tf.app.flags.DEFINE_string('train_model', 'wgangp',
@@ -18,7 +19,7 @@ tf.app.flags.DEFINE_string('train_model', 'wgangp',
 tf.app.flags.DEFINE_string('model', 'default',
                             "model name.")
 
-tf.app.flags.DEFINE_integer('batch_size',32,
+tf.app.flags.DEFINE_integer('batch_size',16,
                             "Number of samples per batch.")
 
 tf.app.flags.DEFINE_integer('epochs', 15,
@@ -48,7 +49,7 @@ tf.app.flags.DEFINE_integer('input_width', 64,
 tf.app.flags.DEFINE_integer('input_length', 64,
                             "input length")
 
-tf.app.flags.DEFINE_string('data','/home/yyl/pjs/pycharm-remote/MyGAN/data/train.npy',
+tf.app.flags.DEFINE_string('data','/home/yyl/pjs/pycharm-remote/MyGAN/data/test-face.npy',
                            "data path")
 
 tf.app.flags.DEFINE_string('checkpoint_dir', 'checkpoint',
@@ -79,6 +80,7 @@ def main(argv=None):
         tester = Tester(locals())
         tester.test()
     print("nice!")
+    # test()
 
 if __name__ == '__main__':
     tf.app.run()
